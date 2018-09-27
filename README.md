@@ -1,11 +1,7 @@
 # Skelerator
+Neural toy data generator.
 
-
-
-## Install
-
-
-### Using Docker [Recommended]
+## Installation 
 
 1. Install graph-tool.
     
@@ -22,6 +18,7 @@
 
 
 ## Example Usage
+
 Generate a toy segmentation with skeletons via:
 
 ```python
