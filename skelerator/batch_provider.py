@@ -1,62 +1,94 @@
-import multiprocessing
 import time
 import numpy as np
+import  multiprocessing
 from skelerator import create_segmentation
+
 
 class BatchProvider(object):
     def __init__(self, 
                  shape,
                  interpolation,
-                 smoothness):
+                 smoothness,
+                 n_workers=8,
+                 verbose=False):
 
         self.shape = shape
         self.interpolation = interpolation
         self.smoothness = smoothness
-        self.pool = multiprocessing.Pool()
-        self.batch_x = []
-        self.batch_y = []
+        self.n_workers = n_workers
+        self.verbose = verbose
 
-    def next_batch(self, 
+        self.queue = multiprocessing.Queue(50)
+        self.worker_queue = multiprocessing.Queue(n_workers)
+        self.done = False
+        self.processes = []
+
+    def next_batch(self,
                    batch_size,
                    n_objects,
                    points_per_skeleton):
-    
-        self.batch_x = []    
-        self.batch_y = []
+
+        if self.verbose:
+            print("Request batch...")
+        if not self.queue.full() and not self.worker_queue.full():
+            if self.verbose:
+                print("Queue not full, spawn workers...")
+            for i in range(self.n_workers):
+                p = multiprocessing.Process(target=self.queue_next_batch, args=(batch_size, n_objects, points_per_skeleton,))
+                p.start()
+                self.processes.append(p)
+
+        batch = self.queue.get()
+        return batch
+
+    def queue_next_batch(self, 
+                         batch_size,
+                         n_objects,
+                         points_per_skeleton):
+
+        self.worker_queue.put(1)
+
+        if self.verbose:
+            print("Worker started")
+        batch_x = []
+        batch_y = []
+
         for batch in range(batch_size):
-            self.pool.apply_async(create_segmentation, 
-                                  args=(
-                                      self.shape,
-                                      n_objects,
-                                      points_per_skeleton,
-                                      self.interpolation,
-                                      self.smoothness),
-                                   callback=self.__catch_batch)
-            #create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness)
-        self.pool.close()
-        self.pool.join()
+            batch = create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness)
+            batch_x.append(batch["raw"])
+            batch_y.append(batch["skeletons"])
 
-        return np.stack(self.batch_x), np.stack(self.batch_y)
+        if self.verbose:
+            print("Add batch to queue...")
+        if not self.done:
+            self.queue.put([np.stack(batch_x), np.stack(batch_y)])
+            self.worker_queue.get()
 
-    def __catch_batch(self, batch):
-        self.batch_x.append(batch["raw"].astype(np.uint64))
-        self.batch_y.append(batch["skeletons"].astype(np.uint64))
+    def finished(self):
+        if self.verbose:
+            print("Batch generation finished. Exiting.")
+        self.done = True
+        for p in self.processes:
+            p.terminate()
+            p.join()
+        
 
 if __name__ == "__main__":
-    n_batches = 5
-
+    batch_size = 2
+    n_batches = 100
     bp = BatchProvider([100,100,100],
                     "linear",
-                    2.0)
+                    2.0,
+                    n_workers=20,
+                    verbose=True)
 
-
-    start = time.time()
-    batch_x, batch_y = bp.next_batch(n_batches, 20, 5)
-    end = time.time()
-    elapsed = end - start
-    
-    print("Batch shapes: ")
-    print(np.shape(batch_x), np.shape(batch_y))
-    print("Batch types: ")
-    print(type(batch_x), type(batch_y))
-    print("Generating {} batches took {} seconds".format(n_batches, elapsed))
+    start_0 = time.time()
+    for i in range(n_batches):
+        start = time.time()
+        batch = bp.next_batch(batch_size, 20, 5)
+        end = time.time()
+        elapsed = end - start
+        print("Generating 1 batch of size {} took {} seconds".format(batch_size, elapsed))
+    bp.finished()
+    end_0 = time.time()
+    print("Generating {} batches of size {} took {} seconds".format(n_batches, batch_size, end_0 - start_0))
