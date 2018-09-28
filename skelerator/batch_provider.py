@@ -3,7 +3,7 @@ import time
 import numpy as np
 from skelerator import create_segmentation
 
-class Skelerator(object):
+class BatchProvider(object):
     def __init__(self, 
                  shape,
                  interpolation,
@@ -45,7 +45,7 @@ class Skelerator(object):
 if __name__ == "__main__":
     n_batches = 5
 
-    bp = Skelerator([100,100,100],
+    bp = BatchProvider([100,100,100],
                     "linear",
                     2.0)
 
