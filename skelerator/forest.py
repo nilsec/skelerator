@@ -7,8 +7,9 @@ import h5py
 from scipy.ndimage.morphology import distance_transform_edt
 from scipy.ndimage.filters import maximum_filter
 import matplotlib.pyplot as plt
-import pickle
-import pdb
+import sys
+import traceback
+
 
 def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, smoothness, write_to=None):
     """
@@ -28,59 +29,62 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
 
     smoothness: Controls the smoothness of the initial noise map used to generate object boundaries.
     """
-    shape = np.array(shape)
-    if len(shape) != 3:
-        raise ValueError("Provide 3D shape.")
+    try:
+        shape = np.array(shape)
+        if len(shape) != 3:
+            raise ValueError("Provide 3D shape.")
 
-    if np.any(shape % 2 != 0):
-        raise ValueError("All shape dimensions have to be even.")
+        if np.any(shape % 2 != 0):
+            raise ValueError("All shape dimensions have to be even.")
 
-    noise = np.abs(np.random.randn(*shape))
-    smoothed_noise = gaussian_filter(noise, sigma=smoothness)
-    
-    # Sample one tree for each object and generate its skeleton:
-    seeds = np.zeros(2*shape, dtype=int)
-    for i in range(n_objects):
+        noise = np.abs(np.random.randn(*shape))
+        smoothed_noise = gaussian_filter(noise, sigma=smoothness)
+        
+        # Sample one tree for each object and generate its skeleton:
+        seeds = np.zeros(2*shape, dtype=int)
+        for i in range(n_objects):
+            """
+            We make the virtual volume twice as large to avoid border effects. To keep the density
+            of points the same we also increase the number of points by a factor of 8 = 2**3. Such that
+            on average we keep the same number of points per unit volume.
+            """
+            points = np.stack([np.random.randint(0, 2*shape[dim], (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
+            tree = Tree(points)
+            skeleton = Skeleton(tree, [1,1,1], "linear", generate_graph=False)
+            seeds = skeleton.draw(seeds, np.array([0,0,0]), i + 1)
+
+       
         """
-        We make the virtual volume twice as large to avoid border effects. To keep the density
-        of points the same we also increase the number of points by a factor of 8 = 2**3. Such that
-        on average we keep the same number of points per unit volume.
+        Cut the volume to original size.
         """
-        points = np.stack([np.random.randint(0, 2*shape[dim], (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
-        tree = Tree(points)
-        skeleton = Skeleton(tree, [1,1,1], "linear")
-        seeds = skeleton.draw(seeds, np.array([0,0,0]), i + 1)
+        seeds = seeds[int(shape[0]/2):int(3*shape[0]/2), int(shape[1]/2):int(3*shape[1]/2), int(shape[2]/2):int(3*shape[2]/2)]
 
-   
-    """
-    Cut the volume to original size.
-    """
-    seeds = seeds[int(shape[0]/2):int(3*shape[0]/2), int(shape[1]/2):int(3*shape[1]/2), int(shape[2]/2):int(3*shape[2]/2)]
+        """
+        We generate an artificial segmentation by first filtering
+        skeleton points that are too close to each other via a non max supression
+        to avoid artifacts. A distance transform of the skeletons plus smoothed noise
+        is then used to calculate a watershed transformation with the skeletons as seeds
+        resulting in the final segmentation.
+        """
+        seeds[maximum_filter(seeds, size=4) != seeds] = 0
+        seeds_dt = distance_transform_edt(seeds==0) + 5. * smoothed_noise
+        segmentation = cwatershed(seeds_dt, seeds)
+        boundaries = find_boundaries(segmentation)
 
-    """
-    We generate an artificial segmentation by first filtering
-    skeleton points that are too close to each other via a non max supression
-    to avoid artifacts. A distance transform of the skeletons plus smoothed noise
-    is then used to calculate a watershed transformation with the skeletons as seeds
-    resulting in the final segmentation.
-    """
-    seeds[maximum_filter(seeds, size=4) != seeds] = 0
-    seeds_dt = distance_transform_edt(seeds==0) + 5. * smoothed_noise
-    segmentation = cwatershed(seeds_dt, seeds)
-    boundaries = find_boundaries(segmentation)
+        if write_to is not None:
+            f = h5py.File(write_to, "w")
+            f.create_dataset("segmentation", data=segmentation.astype(np.uint64))
+            f.create_dataset("skeletons", data=seeds.astype(np.uint64))
+            f.create_dataset("boundaries", data=boundaries.astype(np.uint64))
+            f.create_dataset("smoothed_noise", data=smoothed_noise)
+            f.create_dataset("distance_transform", data=seeds_dt)
 
-    if write_to is not None:
-        f = h5py.File(write_to, "w")
-        f.create_dataset("segmentation", data=segmentation.astype(np.uint64))
-        f.create_dataset("skeletons", data=seeds.astype(np.uint64))
-        f.create_dataset("boundaries", data=boundaries.astype(np.uint64))
-        f.create_dataset("smoothed_noise", data=smoothed_noise)
-        f.create_dataset("distance_transform", data=seeds_dt)
+        data = {"segmentation": segmentation, "skeletons": seeds, "raw": boundaries}
 
-    data = {"segmentation": segmentation, "skeletons": seeds, "raw": boundaries}
-    pickle.dumps(data)
+    except:
+        raise Exception("".join(traceback.format_exception(*sys.exc_info())))
+
     return data
-    #return segmentation, seeds, boundaries, noise, smoothed_noise, seeds_dt
 
 if __name__ == "__main__":
     shape = np.array([100,100,100])

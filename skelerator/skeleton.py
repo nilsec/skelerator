@@ -1,4 +1,5 @@
 import graph_tool as gt
+gt.openmp_set_num_threads(1)
 import numpy as np
 
 from skelerator.dda3 import DDA3
@@ -6,7 +7,7 @@ from skelerator.crw import ConstrainedRandomWalk
 from skelerator.tree import Tree
 
 class Skeleton(Tree):
-    def __init__(self, tree, scaling, interpolation, verbose=False):
+    def __init__(self, tree, scaling, interpolation, verbose=False, generate_graph=True):
         """
         A skeleton is a graph on a 3D voxel grid where each voxel is encoded by
         a vertex.
@@ -16,7 +17,11 @@ class Skeleton(Tree):
         self.verbose = verbose
 
         self.points, self.edge_to_line = self.__generate(interpolation)
-        self.g = self.__to_graph(self.points, self.edge_to_line)
+
+        if generate_graph:
+            self.g = self.__to_graph(self.points, self.edge_to_line)
+        else:
+            self.g = None
 
     def get_tree(self):
         return self.tree
@@ -31,22 +36,13 @@ class Skeleton(Tree):
         return self.g
 
     def draw(self, canvas, offset, label):
-        if self.verbose:
-            print("Draw skeleton...")
-        canvas_size = np.shape(canvas)
-
-        for v in self.g.vertices():
-            position = self.get_position(v) + offset
-            x = position[0]
-            y = position[1]
-            z = position[2]
-
+        for p in self.points:
             try:
-                canvas[z, y, x] = label
+                canvas[p[2],p[1],p[0]] = label
             except IndexError:
-                print("WARNING: Provided canvas is too small to draw all skeleton points.")
+                print("WARNING: Provided canvas is too small to draw all skeleton points")
 
-        return np.array(canvas, dtype=int)
+        return np.array(canvas)
 
     def __generate(self, interpolation):
         """

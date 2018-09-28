@@ -1,4 +1,5 @@
 import graph_tool as gt
+gt.openmp_set_num_threads(1)
 from graph_tool.generation import triangulation
 from graph_tool.topology import min_spanning_tree
 import numpy as np

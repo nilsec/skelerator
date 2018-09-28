@@ -1,5 +1,6 @@
 import numpy as np
 import graph_tool as gt
+gt.openmp_set_num_threads(1)
 from graph_tool.search import BFSVisitor, bfs_search
 import pdb
 from skelerator.tree import Tree
@@ -17,6 +18,9 @@ class Neuron(Tree):
         assert(min_radius>0)
         assert(max_radius>=min_radius)
         self.skeleton = skeleton
+        if self.skeleton.get_graph() is None:
+            raise ValueError("For neuron creation a skeleton graph is required.")
+
         self.g = self.skeleton.get_graph()
         self.source = self.skeleton.get_root_nodes()[0]
         self.points = skeleton.get_points()
