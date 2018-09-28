@@ -6,13 +6,15 @@ from skelerator.crw import ConstrainedRandomWalk
 from skelerator.tree import Tree
 
 class Skeleton(Tree):
-    def __init__(self, tree, scaling, interpolation):
+    def __init__(self, tree, scaling, interpolation, verbose=False):
         """
         A skeleton is a graph on a 3D voxel grid where each voxel is encoded by
         a vertex.
         """
         self.tree = tree
         self.scaling = scaling
+        self.verbose = verbose
+
         self.points, self.edge_to_line = self.__generate(interpolation)
         self.g = self.__to_graph(self.points, self.edge_to_line)
 
@@ -29,7 +31,8 @@ class Skeleton(Tree):
         return self.g
 
     def draw(self, canvas, offset, label):
-        print("Draw skeleton...")
+        if self.verbose:
+            print("Draw skeleton...")
         canvas_size = np.shape(canvas)
 
         for v in self.g.vertices():
@@ -53,7 +56,8 @@ class Skeleton(Tree):
         """
         if not interpolation in ["linear", "random"]:
             raise ValueError("Choose between random or linear interpolation")
-        print("Interpolate edges {}...".format(interpolation))
+        if self.verbose:
+            print("Interpolate edges {}...".format(interpolation))
 
         points = []
         edge_to_line = {}
@@ -83,7 +87,8 @@ class Skeleton(Tree):
         gt graph to preserve neighborhood
         information.
         """
-        print("Initialize skeleton graph...")
+        if self.verbose:
+            print("Initialize skeleton graph...")
         g = gt.Graph(directed=False)
         g.add_vertex(len(points_unique))
         vp_pos = g.new_vertex_property("vector<int>")

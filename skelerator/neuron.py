@@ -5,7 +5,7 @@ import pdb
 from skelerator.tree import Tree
 
 class Neuron(Tree):
-    def __init__(self, skeleton, min_radius, max_radius):
+    def __init__(self, skeleton, min_radius, max_radius, verbose=False):
         """
         A neuron is a graph on 3d voxel grid (its skeleton/centerline)
         together with associated radii for each vertex indicaing
@@ -22,10 +22,13 @@ class Neuron(Tree):
         self.points = skeleton.get_points()
         self.min_radius = min_radius
         self.max_radius = max_radius
+        self.verbose = verbose
+
         self.radius_vp = self.generate()
 
     def generate(self):
-        print("Generate neuron radii...")
+        if self.verbose:
+            print("Generate neuron radii...")
         rrg = RandomRadiusGenerator(self.skeleton,
                                     self.source,
                                     self.min_radius,
@@ -53,7 +56,8 @@ class Neuron(Tree):
 
 
     def draw(self, canvas, offset):
-        print("Draw neuron...")
+        if self.verbose:
+            print("Draw neuron...")
         canvas_size = np.shape(canvas)
         xx,yy,zz = np.mgrid[:2*self.max_radius, :2*self.max_radius, :2*self.max_radius]
 

@@ -5,7 +5,7 @@ import numpy as np
 from xml.dom import minidom
 
 class Tree(object):
-    def __init__(self, points):
+    def __init__(self, points, verbose=False):
         """
         A tree is a minimal spanning tree
         between a list of points in 3D.
@@ -17,6 +17,7 @@ class Tree(object):
 
         # Make points unique to avoid duplicate vertices:
         self.points = np.unique(points, axis=0)
+        self.verbose = verbose
         self.g = self.__generate()
 
     def get_root_nodes(self):
@@ -123,20 +124,23 @@ class Tree(object):
         return self.g.get_edges()
 
     def __generate(self):
-        print("Generate tree...")
+        if self.verbose:
+            print("Generate tree...")
         g = self.__gen_delaunay_graph()
         distance_weights = self.__get_distance_weights(g)
         tree = self.__get_minimal_spanning_tree(g, weights=distance_weights)
         return tree
 
     def __gen_delaunay_graph(self):
-        print("Generate delaunay triangulation of unique points...")
+        if self.verbose:
+            print("Generate delaunay triangulation of unique points...")
         g, pos = triangulation(self.points, type="delaunay")
         g.vertex_properties["position"] = pos
         return g
 
     def __get_distance_weights(self, g):
-        print("Generate edge weights...")
+        if self.verbose:
+            print("Generate edge weights...")
         weights = g.new_edge_property("double")
         for e in g.edges():
             pos_source = np.array(g.vertex_properties["position"][e.source()], dtype=float) 
@@ -145,7 +149,8 @@ class Tree(object):
         return weights
 
     def __get_minimal_spanning_tree(self, g, weights=None):
-        print("Get minimal spanning tree...")
+        if self.verbose:
+            print("Get minimal spanning tree...")
         tree_map = min_spanning_tree(g, weights=weights)
         g.set_edge_filter(tree_map)
         return g
