@@ -26,9 +26,4 @@ class DDA3:
         for step in range(int(self.max_length)):
             self.line.append(dda_round((step + 1) * self.dv + self.start))
 
-        assert(np.all(self.line[-1] == self.end))
-        
-        for n in range(len(self.line) - 1):
-            assert(np.linalg.norm(self.line[n+1] - self.line[n]) <= np.sqrt(3))
-        
         return self.line
