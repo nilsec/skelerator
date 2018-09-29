@@ -2,6 +2,8 @@ import time
 import numpy as np
 import  multiprocessing
 from skelerator import create_segmentation
+import pdb
+import h5py
 
 
 class BatchProvider(object):
@@ -55,8 +57,8 @@ class BatchProvider(object):
 
         for batch in range(batch_size):
             batch = create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness)
-            batch_x.append(batch["raw"])
-            batch_y.append(batch["skeletons"])
+            batch_x.append(batch["raw"].astype("bool"))
+            batch_y.append(batch["skeletons"].astype("bool"))
 
         if self.verbose:
             print("Add batch to queue...")
@@ -71,24 +73,3 @@ class BatchProvider(object):
         for p in self.processes:
             p.terminate()
             p.join()
-        
-
-if __name__ == "__main__":
-    batch_size = 2
-    n_batches = 100
-    bp = BatchProvider([100,100,100],
-                    "linear",
-                    2.0,
-                    n_workers=20,
-                    verbose=True)
-
-    start_0 = time.time()
-    for i in range(n_batches):
-        start = time.time()
-        batch = bp.next_batch(batch_size, 20, 5)
-        end = time.time()
-        elapsed = end - start
-        print("Generating 1 batch of size {} took {} seconds".format(batch_size, elapsed))
-    bp.finished()
-    end_0 = time.time()
-    print("Generating {} batches of size {} took {} seconds".format(n_batches, batch_size, end_0 - start_0))
