@@ -8,13 +8,19 @@ import h5py
 
 class BatchProvider(object):
     def __init__(self, 
-                 shape,
+                 shape_in,
+                 shape_out,
                  interpolation,
                  smoothness,
                  n_workers=8,
                  verbose=False):
 
-        self.shape = shape
+        self.shape = np.array(shape_in)
+        self.shape_out = np.array(shape_out)
+        if np.any(self.shape-self.shape_out < 0):
+            raise ValueError("Output shape needs to be smaller than input shape")
+        if np.any((self.shape - self.shape_out) % 2 != 0):
+            raise ValueError("Input shape minus output shape must be divisible by 2 in all dimensions")
         self.interpolation = interpolation
         self.smoothness = smoothness
         self.n_workers = n_workers
@@ -54,17 +60,27 @@ class BatchProvider(object):
             print("Worker started")
         batch_x = []
         batch_y = []
+        batch_y_out = []
 
         for batch in range(batch_size):
             batch = create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness)
             batch_x.append(batch["raw"].astype("bool"))
             batch_y.append(batch["skeletons"].astype("bool"))
+            batch_y_out.append(self.crop(batch["skeletons"]).astype("bool"))
 
         if self.verbose:
             print("Add batch to queue...")
         if not self.done:
-            self.queue.put([np.stack(batch_x), np.stack(batch_y)])
+            self.queue.put([np.stack(batch_x), np.stack(batch_y), np.stack(batch_y_out)])
             self.worker_queue.get()
+
+    def crop(self, y):
+        lower = ((self.shape - self.shape_out)/2).astype(int)
+        upper = self.shape - lower
+        y = y[lower[0]:upper[0], lower[1]:upper[1], lower[2]:upper[2]]
+        return y
+            
+
 
     def finished(self):
         if self.verbose:
@@ -73,3 +89,20 @@ class BatchProvider(object):
         for p in self.processes:
             p.terminate()
             p.join()
+
+if __name__ == "__main__":
+    bp = BatchProvider([100,100,100],
+                       [50, 50, 50],
+                       "linear",
+                       2.0)
+
+    batch = bp.next_batch(2, 10, 5)
+    bp.finished()
+
+    f = h5py.File("./test_crop.h5")
+    f.create_dataset("x", data=batch[0][0])
+    f.create_dataset("y", data=batch[1][0])
+    dset = f.create_dataset("y_out", data=batch[2][0])
+    dset.attrs.create("offset", np.array([25,25,25]))
+    pdb.set_trace()
+
