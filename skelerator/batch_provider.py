@@ -61,17 +61,19 @@ class BatchProvider(object):
         batch_x = []
         batch_y = []
         batch_y_out = []
+        batch_z_out = []
 
         for batch in range(batch_size):
             batch = create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness)
             batch_x.append(batch["raw"].astype("bool"))
             batch_y.append(batch["skeletons"].astype("bool"))
             batch_y_out.append(self.crop(batch["skeletons"]).astype("bool"))
+            batch_z_out.append(self.crop(batch["segmentation"]))
 
         if self.verbose:
             print("Add batch to queue...")
         if not self.done:
-            self.queue.put([np.stack(batch_x), np.stack(batch_y), np.stack(batch_y_out)])
+            self.queue.put([np.stack(batch_x), np.stack(batch_y), np.stack(batch_y_out), np.stack(batch_z_out)])
             self.worker_queue.get()
 
     def crop(self, y):
