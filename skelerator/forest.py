@@ -9,9 +9,11 @@ from scipy.ndimage.filters import maximum_filter
 import matplotlib.pyplot as plt
 import sys
 import traceback
+import time
+import multiprocessing as mp
 
 
-def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, smoothness, write_to=None):
+def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, smoothness, write_to=None, seed=0):
     """
     Creates a toy segmentation containing skeletons.
 
@@ -42,6 +44,9 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         
         # Sample one tree for each object and generate its skeleton:
         seeds = np.zeros(2*shape, dtype=int)
+        pid = mp.current_process()._identity[0]
+        seed = pid*3 + seed
+        np.random.seed(seed)
         for i in range(n_objects):
             """
             We make the virtual volume twice as large to avoid border effects. To keep the density

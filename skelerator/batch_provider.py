@@ -45,6 +45,7 @@ class BatchProvider(object):
                 p = multiprocessing.Process(target=self.queue_next_batch, args=(batch_size, n_objects, points_per_skeleton,))
                 p.start()
                 self.processes.append(p)
+                #self.queue_next_batch(batch_size, n_objects, points_per_skeleton, seed + i)
 
         batch = self.queue.get()
         return batch
@@ -58,31 +59,37 @@ class BatchProvider(object):
 
         if self.verbose:
             print("Worker started")
-        batch_x = []
-        batch_y = []
-        batch_y_out = []
-        batch_z_out = []
 
+        batch_raw = []
+        batch_skel = []
+        batch_seg = []
+        batch_raw_out = []
+        batch_skel_out = []
+        batch_seg_out = []
+
+        k = 0
         for batch in range(batch_size):
-            batch = create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness)
-            batch_x.append(batch["raw"].astype("bool"))
-            batch_y.append(batch["skeletons"].astype("bool"))
-            batch_y_out.append(self.crop(batch["skeletons"]).astype("bool"))
-            batch_z_out.append(self.crop(batch["segmentation"]))
+            batch = create_segmentation(self.shape, n_objects, points_per_skeleton, self.interpolation, self.smoothness, seed=int(time.time()/((k+1)*3)))
+            batch_raw.append(batch["raw"].astype("bool"))
+            batch_skel.append(batch["skeletons"].astype("bool"))
+            batch_seg.append(batch["segmentation"].astype(np.uint32))
+            batch_raw_out.append(self.crop(batch["raw"]).astype("bool"))
+            batch_skel_out.append(self.crop(batch["skeletons"].astype("bool")))
+            batch_seg_out.append(self.crop(batch["segmentation"].astype(np.uint32)))
+            k += 1
 
         if self.verbose:
             print("Add batch to queue...")
-        if not self.done:
-            self.queue.put([np.stack(batch_x), np.stack(batch_y), np.stack(batch_y_out), np.stack(batch_z_out)])
-            self.worker_queue.get()
+
+        self.queue.put([np.stack(batch_raw), np.stack(batch_skel), np.stack(batch_seg), 
+                        np.stack(batch_raw_out), np.stack(batch_skel_out), np.stack(batch_seg_out)])
+        self.worker_queue.get()
 
     def crop(self, y):
         lower = ((self.shape - self.shape_out)/2).astype(int)
         upper = self.shape - lower
         y = y[lower[0]:upper[0], lower[1]:upper[1], lower[2]:upper[2]]
         return y
-            
-
 
     def finished(self):
         if self.verbose:
@@ -98,13 +105,10 @@ if __name__ == "__main__":
                        "linear",
                        2.0)
 
-    batch = bp.next_batch(2, 10, 5)
+    for i in range(5):
+        batch = bp.next_batch(2, 10, 5)
+        f = h5py.File("./test_crop_{}.h5".format(i))
+        f.create_dataset("x", data=batch[0][0])
+        dset = f.create_dataset("y", data=batch[-1][0].astype(np.uint32))
+        dset.attrs.create("offset", np.array([25,25,25]))
     bp.finished()
-
-    f = h5py.File("./test_crop.h5")
-    f.create_dataset("x", data=batch[0][0])
-    f.create_dataset("y", data=batch[1][0])
-    dset = f.create_dataset("y_out", data=batch[2][0])
-    dset.attrs.create("offset", np.array([25,25,25]))
-    pdb.set_trace()
-
