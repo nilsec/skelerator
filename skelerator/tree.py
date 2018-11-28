@@ -89,6 +89,12 @@ class Tree(object):
         edges = np.array(sorted(edges, key=lambda x: x[2]))
         return [self.get_edge(e[0], e[1]) for e in edges]
 
+    def get_edge_array(self):
+        return self.g.get_edge_array()
+
+    def get_edge(u, v):
+        return self.g.get_edge(u,v)
+
     def get_neighbours(self, v):
         incident_edges = self.get_incident_edges(v)
         nbs = set()
@@ -123,6 +129,13 @@ class Tree(object):
 
     def get_edge_array(self):
         return self.g.get_edges()
+
+    def set_edge_filter(self, ep):
+        self.g.set_edge_filter(ep)
+
+    def get_components(self):
+        components = self.g.get_components(min_vertices=0, output_folder=None)
+        return components
 
     def __generate(self):
         if self.verbose:
