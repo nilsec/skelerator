@@ -12,7 +12,6 @@ import traceback
 import time
 import multiprocessing as mp
 
-
 def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, smoothness, write_to=None, seed=0):
     """
     Creates a toy segmentation containing skeletons.
@@ -53,7 +52,7 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
             of points the same we also increase the number of points by a factor of 8 = 2**3. Such that
             on average we keep the same number of points per unit volume.
             """
-            points = np.stack([np.random.randint(0, 2*shape[dim], (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
+            points = np.stack([np.random.randint(0, 2*shape[2 - dim], (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
             tree = Tree(points)
             skeleton = Skeleton(tree, [1,1,1], "linear", generate_graph=False)
             seeds = skeleton.draw(seeds, np.array([0,0,0]), i + 1)
@@ -90,13 +89,3 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
     return data
-
-if __name__ == "__main__":
-    shape = np.array([100,100,100])
-    n_objects = 20
-    points_per_skeleton = 5
-    smoothness = 2
-    write_to = "./test_segmentation.h5"
-    interpolation = "linear"
-    data = create_segmentation(shape, n_objects, points_per_skeleton, interpolation , smoothness, write_to=write_to)
-    #get_raw(segmentation)
