@@ -43,11 +43,13 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         
         # Sample one tree for each object and generate its skeleton:
         max_dim = np.max(shape)
+        double_max_dim = 2*max_dim
         seeds = np.zeros(2*np.array([max_dim]*len(shape)), dtype=int)
 
         # pid = mp.current_process()._identity[0]
+        # print "current:", mp.current_process()._identity
         # seed = pid*3 + seed
-        # np.random.seed(seed)
+        np.random.seed(seed)
 
         for i in range(n_objects):
             """
@@ -55,10 +57,8 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
             of points the same we also increase the number of points by a factor of 8 = 2**3. Such that
             on average we keep the same number of points per unit volume.
             """
-            dm = 2*max_dim
-            points = np.stack([np.random.randint(0, dm, (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
-            # points = np.stack([np.random.randint(0, 2*shape[2 - dim], (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
-
+            
+            points = np.random.randint(0, double_max_dim, (3, 2**3*points_per_skeleton)).T
             tree = Tree(points)
             skeleton = Skeleton(tree, [1,1,1], "linear", generate_graph=False)
             seeds = skeleton.draw(seeds, np.array([0,0,0]), i + 1)
@@ -66,7 +66,6 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         """
         Cut the volume to original size (slice out middle of largevirtual volume).
         """
-        # seeds = seeds[int(shape[0]/2):int(3*shape[0]/2), int(shape[1]/2):int(3*shape[1]/2), int(shape[2]/2):int(3*shape[2]/2)]
         seeds = seeds[int((dm-shape[0])/2):int((dm+shape[0])/2), int((dm-shape[1])/2):int((dm+shape[1])/2), int((dm-shape[2])/2):int((dm+shape[2])/2)]
 
         """
@@ -95,10 +94,3 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
 
     return data
-
-# main kept here for debugging
-# if __name__ == "__main__":
-#     segmentation = create_segmentation(np.array([10,70,20]), 20, 3, "linear", 2)["segmentation"]
-#     f2 = plt.figure(2)
-#     plt.imshow(segmentation[0])
-#     plt.show()
