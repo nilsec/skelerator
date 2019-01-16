@@ -46,9 +46,8 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         double_max_dim = 2*max_dim
         seeds = np.zeros(2*np.array([max_dim]*len(shape)), dtype=int)
 
-        # pid = mp.current_process()._identity[0]
-        # print "current:", mp.current_process()._identity
-        # seed = pid*3 + seed
+        pid = mp.current_process().pid
+        seed = pid*3 + seed
         np.random.seed(seed)
 
         for i in range(n_objects):
@@ -66,7 +65,7 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         """
         Cut the volume to original size (slice out middle of largevirtual volume).
         """
-        seeds = seeds[int((dm-shape[0])/2):int((dm+shape[0])/2), int((dm-shape[1])/2):int((dm+shape[1])/2), int((dm-shape[2])/2):int((dm+shape[2])/2)]
+        seeds = seeds[int((double_max_dim-shape[0])/2):int((double_max_dim+shape[0])/2), int((double_max_dim-shape[1])/2):int((double_max_dim+shape[1])/2), int((double_max_dim-shape[2])/2):int((double_max_dim+shape[2])/2)]
 
         """
         We generate an artificial segmentation by first filtering
