@@ -42,26 +42,30 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         smoothed_noise = gaussian_filter(noise, sigma=smoothness)
         
         # Sample one tree for each object and generate its skeleton:
-        seeds = np.zeros(2*shape, dtype=int)
-        pid = mp.current_process()._identity[0]
+        max_dim = np.max(shape)
+        double_max_dim = 2*max_dim
+        seeds = np.zeros(2*np.array([max_dim]*len(shape)), dtype=int)
+
+        pid = mp.current_process().pid
         seed = pid*3 + seed
         np.random.seed(seed)
+
         for i in range(n_objects):
             """
             We make the virtual volume twice as large to avoid border effects. To keep the density
             of points the same we also increase the number of points by a factor of 8 = 2**3. Such that
             on average we keep the same number of points per unit volume.
             """
-            points = np.stack([np.random.randint(0, 2*shape[2 - dim], (2**3)*points_per_skeleton) for dim in range(3)], axis=1)
+            
+            points = np.random.randint(0, double_max_dim, (3, 2**3*points_per_skeleton)).T
             tree = Tree(points)
             skeleton = Skeleton(tree, [1,1,1], "linear", generate_graph=False)
             seeds = skeleton.draw(seeds, np.array([0,0,0]), i + 1)
 
-       
         """
-        Cut the volume to original size.
+        Cut the volume to original size (slice out middle of largevirtual volume).
         """
-        seeds = seeds[int(shape[0]/2):int(3*shape[0]/2), int(shape[1]/2):int(3*shape[1]/2), int(shape[2]/2):int(3*shape[2]/2)]
+        seeds = seeds[int((double_max_dim-shape[0])/2):int((double_max_dim+shape[0])/2), int((double_max_dim-shape[1])/2):int((double_max_dim+shape[1])/2), int((double_max_dim-shape[2])/2):int((double_max_dim+shape[2])/2)]
 
         """
         We generate an artificial segmentation by first filtering
