@@ -42,7 +42,7 @@ class Skeleton(Tree):
             except IndexError:
                 print("WARNING: Provided canvas is too small to draw all skeleton points")
 
-        return np.array(canvas)
+        return canvas
 
     def __generate(self, interpolation):
         """

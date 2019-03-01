@@ -12,8 +12,9 @@ import traceback
 import time
 import multiprocessing as mp
 
-def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, smoothness, write_to=None, seed=0):
+def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, smoothness, noise_strength, write_to=None, seed=0):
     """
+    
     Creates a toy segmentation containing skeletons.
 
     Args:
@@ -44,7 +45,9 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         # Sample one tree for each object and generate its skeleton:
         max_dim = np.max(shape)
         double_max_dim = 2*max_dim
-        seeds = np.zeros(2*np.array([max_dim]*len(shape)), dtype=int)
+
+        seeds = np.zeros(2*np.array([max_dim]*len(shape)), dtype=np.int16)
+        # seeds = np.zeros([max_dim*2]*len(shape), dtype=np.uint8)
 
         pid = mp.current_process().pid
         seed = pid*3 + seed
@@ -56,12 +59,11 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
             of points the same we also increase the number of points by a factor of 8 = 2**3. Such that
             on average we keep the same number of points per unit volume.
             """
-            
             points = np.random.randint(0, double_max_dim, (3, 2**3*points_per_skeleton)).T
             tree = Tree(points)
             skeleton = Skeleton(tree, [1,1,1], "linear", generate_graph=False)
             seeds = skeleton.draw(seeds, np.array([0,0,0]), i + 1)
-
+        
         """
         Cut the volume to original size (slice out middle of largevirtual volume).
         """
@@ -74,8 +76,9 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
         is then used to calculate a watershed transformation with the skeletons as seeds
         resulting in the final segmentation.
         """
+
         seeds[maximum_filter(seeds, size=4) != seeds] = 0
-        seeds_dt = distance_transform_edt(seeds==0) + 5. * smoothed_noise
+        seeds_dt = distance_transform_edt(seeds==0) + noise_strength * smoothed_noise
         segmentation = cwatershed(seeds_dt, seeds)
         boundaries = find_boundaries(segmentation)
 
@@ -91,5 +94,4 @@ def create_segmentation(shape, n_objects, points_per_skeleton, interpolation, sm
 
     except:
         raise Exception("".join(traceback.format_exception(*sys.exc_info())))
-
     return data
